@@ -66,6 +66,13 @@ try {
   const bad = await rpc("tools/call", { name: "task_show", arguments: { id: "DIVE-000000" } });
   assert(bad.result?.isError === true, "unknown task id -> clean isError");
 
+  // arg-confusion hardening: an id starting with '-' must be rejected, not run
+  const dashy = await rpc("tools/call", { name: "task_show", arguments: { id: "--all" } });
+  assert(
+    dashy.result?.isError === true && /invalid task id/.test(dashy.result.content?.[0]?.text || ""),
+    "leading-dash id -> rejected as invalid"
+  );
+
   console.log("\nALL SMOKE CHECKS PASSED");
   child.kill();
   process.exit(0);

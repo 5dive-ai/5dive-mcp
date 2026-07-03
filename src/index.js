@@ -97,12 +97,16 @@ const TOOLS = [
       additionalProperties: false,
     },
     toArgs(input) {
-      const argv = ["task", "add", String(input.title)];
+      // Flags first, then `--`, then the positional title. The `--`
+      // end-of-options separator makes a title that starts with "--" safe
+      // (the CLI treats everything after `--` as positional, not a flag).
+      const argv = ["task", "add"];
       pushFlag(argv, "body", input.body);
       pushFlag(argv, "priority", input.priority);
       pushFlag(argv, "assignee", input.assignee);
       pushFlag(argv, "parent", input.parent);
       pushFlag(argv, "from", input.from);
+      argv.push("--", String(input.title));
       return argv;
     },
   },
@@ -119,7 +123,12 @@ const TOOLS = [
       additionalProperties: false,
     },
     toArgs(input) {
-      return ["task", "show", String(input.id)];
+      // `task show` reads its id positionally without a `--` separator, so
+      // guard against an id that would be misparsed as a flag. Real ids are
+      // numeric or DIVE-N and never start with "-".
+      const id = String(input.id);
+      if (id.startsWith("-")) throw new Error(`invalid task id: ${id}`);
+      return ["task", "show", id];
     },
   },
   {
@@ -161,8 +170,11 @@ const TOOLS = [
       additionalProperties: false,
     },
     toArgs(input) {
-      const argv = ["agent", "send", String(input.name), `--message=${input.message}`];
+      // Flags first, then `--`, then the positional recipient name, so a
+      // name starting with "--" can't be misparsed as a flag.
+      const argv = ["agent", "send", `--message=${input.message}`];
       pushFlag(argv, "from", input.from);
+      argv.push("--", String(input.name));
       return argv;
     },
   },

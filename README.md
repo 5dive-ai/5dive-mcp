@@ -65,7 +65,7 @@ reads its own credentials from the box.
 ## Scope
 
 This mirrors a curated slice of the CLI (tasks, agents, digest), not its full
-surface. It is a distribution and convenience layer, not a new API — for
+surface. It is a distribution and convenience layer, not a new API. For
 everything else, use the `5dive` CLI directly (`5dive --help`).
 
 ## License

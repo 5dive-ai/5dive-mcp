@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.5dive-ai/5dive-mcp",
+  "description": "Expose the 5dive agent-fleet CLI (tasks, agents, digest) as stdio MCP tools.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/5dive-ai/5dive-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@5dive/mcp",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        { "name": "FIVEDIVE_SUDO", "description": "Set to 1 to prefix CLI calls with sudo (managed 5dive boxes need root).", "isRequired": false },
+        { "name": "FIVEDIVE_BIN", "description": "Path to the 5dive binary (default: 5dive on PATH).", "isRequired": false },
+        { "name": "FIVEDIVE_TIMEOUT_MS", "description": "Per-call timeout in milliseconds (default: 30000).", "isRequired": false }
+      ]
+    }
+  ]
+}

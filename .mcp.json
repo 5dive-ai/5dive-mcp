@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "5dive": {
+      "command": "node",
+      "args": ["src/index.js"],
+      "env": { "FIVEDIVE_SUDO": "1" }
+    }
+  }
+}

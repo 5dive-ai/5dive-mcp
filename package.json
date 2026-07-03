@@ -1,0 +1,39 @@
+{
+  "name": "@5dive/mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (stdio) server for 5dive — expose the 5dive agent-fleet CLI (tasks, agents, digest) as MCP tools.",
+  "type": "module",
+  "bin": {
+    "5dive-mcp": "src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "5dive",
+    "ai-agents",
+    "agent-fleet",
+    "cli"
+  ],
+  "author": "5dive",
+  "license": "MIT",
+  "homepage": "https://5dive.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5dive-ai/5dive-mcp.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.0"
+  }
+}

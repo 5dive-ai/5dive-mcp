@@ -66,7 +66,7 @@ reads its own credentials from the box.
 
 This mirrors a curated slice of the CLI (tasks, agents, digest), not its full
 surface. It is a distribution and convenience layer, not a new API. For
-everything else, use the `5dive` CLI directly (`5dive --help`).
+everything else, use the `5dive` CLI directly (`5dive --help`). Full docs: https://5dive.ai/docs/5dive-cli
 
 ## License
 

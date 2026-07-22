@@ -1,14 +1,19 @@
 # 5dive MCP server
 
-A [Model Context Protocol](https://modelcontextprotocol.io) (stdio) server that
-exposes the [5dive](https://5dive.com) agent-fleet CLI as MCP tools. Point any
-MCP client (Claude Desktop, Cursor, Cline, or your own) at it to file tasks,
-inspect and message agents, and read the fleet digest from inside a model
+[![npm](https://img.shields.io/npm/v/@5dive/mcp)](https://www.npmjs.com/package/@5dive/mcp)
+[![Awesome MCP Servers](https://img.shields.io/badge/Awesome-MCP%20Servers-8A2BE2)](https://github.com/punkpeye/awesome-mcp-servers)
+
+Expose the [**5dive**](https://5dive.ai) agent-fleet CLI as [Model Context
+Protocol](https://modelcontextprotocol.io) tools. Point any MCP client (Claude
+Desktop, Cursor, Cline, or your own) at this stdio server to file tasks, inspect
+and message agents, and read the fleet digest — directly from inside a model
 context.
 
-It is a thin, honest adapter: every tool shells out to the local `5dive` binary's
-machine-readable `--json` surface and returns the result. The CLI does all the
-real work, so the server inherits its auth, permissions, and audit log for free.
+[5dive](https://5dive.ai) is the CLI + control plane for running a fleet of
+autonomous coding agents as a self-governing company. This server is a thin,
+honest adapter: every tool shells out to the local `5dive` binary's
+machine-readable `--json` surface and returns the result — so it inherits the
+CLI's auth, permissions, and audit log for free, and never handles secrets itself.
 
 ## Tools
 

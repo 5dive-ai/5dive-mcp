@@ -29,7 +29,7 @@ CLI's auth, permissions, and audit log for free, and never handles secrets itsel
 ## Requirements
 
 - Node.js >= 18
-- The `5dive` CLI installed and on `PATH` (`curl https://install.5dive.com | sudo bash`).
+- The `5dive` CLI installed and on `PATH` (`curl https://install.5dive.ai | sudo bash`).
 
 ## Install & run
 

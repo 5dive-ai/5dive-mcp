@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "io.github.5dive-ai/5dive-mcp",
-  "description": "Expose the 5dive agent-fleet CLI (tasks, agents, digest) as stdio MCP tools.",
-  "version": "0.1.2",
+  "description": "Expose the 5dive agent-fleet CLI (tasks, agents, digest) as MCP tools, over stdio or Streamable HTTP.",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/5dive-ai/5dive-mcp",
     "source": "github"
@@ -11,7 +11,7 @@
     {
       "registryType": "npm",
       "identifier": "@5dive/mcp",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         { "name": "FIVEDIVE_SUDO", "description": "Set to 1 to prefix CLI calls with sudo (managed 5dive boxes need root).", "isRequired": false },

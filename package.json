@@ -1,8 +1,8 @@
 {
   "name": "@5dive/mcp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "mcpName": "io.github.5dive-ai/5dive-mcp",
-  "description": "Model Context Protocol (stdio) server for 5dive. Exposes the 5dive agent-fleet CLI (tasks, agents, digest) as MCP tools.",
+  "description": "Model Context Protocol server for 5dive, over stdio or Streamable HTTP. Exposes the 5dive agent-fleet CLI (tasks, agents, digest) as MCP tools, locally or to a remote client such as ChatGPT.",
   "type": "module",
   "bin": {
     "5dive-mcp": "src/index.js"

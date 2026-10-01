@@ -1,262 +1,153 @@
 #!/usr/bin/env node
-// 5dive MCP server (stdio).
+// 5dive MCP server.
 //
-// Exposes the 5dive agent-fleet CLI as Model Context Protocol tools. Every tool
-// shells out to the local `5dive` binary with its machine-readable `--json`
-// surface ({ok:true,data} | {ok:false,error}) and returns the `data` payload,
-// so this server is a thin, honest adapter — the CLI does all the real work.
+//   5dive-mcp                         stdio (Claude Desktop, Cursor, Cline, …)
+//   5dive-mcp serve [--listen=H:P]    Streamable HTTP, for a client in someone
+//                                     else's cloud (ChatGPT, an OpenAI dot)
+//   5dive-mcp token create|list|revoke
 //
-// Config (env):
-//   FIVEDIVE_BIN   path to the 5dive binary (default: "5dive", found on PATH)
-//   FIVEDIVE_SUDO  if set to "1"/"true", prefix invocations with sudo. Managed
-//                  5dive boxes require root for most subcommands; self-hosted
-//                  setups that already run as root should leave this unset.
-//   FIVEDIVE_TIMEOUT_MS  per-call timeout in ms (default: 30000)
+// The tools live in tools.js and are the same over both transports; the HTTP
+// side and its guards are in http.js, the bearer tokens in tokens.js.
 
-import { execFile } from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { TOOLS, BIN_LABEL, callTool } from "./tools.js";
+import { createServer, isLoopback } from "./http.js";
+import { auditPath, createToken, listTokens, revokeToken, tokensPath } from "./tokens.js";
 
-const BIN = process.env.FIVEDIVE_BIN || "5dive";
-const SUDO = /^(1|true|yes)$/i.test(process.env.FIVEDIVE_SUDO || "");
-const TIMEOUT_MS = Number(process.env.FIVEDIVE_TIMEOUT_MS) || 30000;
+const USAGE = `usage:
+  5dive-mcp                          run over stdio (the default)
+  5dive-mcp serve [--listen=127.0.0.1:8741] [--path=/mcp] [--rate=60]
+                  [--allow-public-http]
+  5dive-mcp token create --name=<name> [--write]
+  5dive-mcp token list
+  5dive-mcp token revoke --name=<name>`;
 
-// Run `5dive --json <args...>` with no shell (argv passed directly, so user
-// input can never be interpreted as shell syntax). Resolves to the parsed
-// envelope; rejects with a readable message on transport or CLI-level error.
-function run5dive(args) {
-  const file = SUDO ? "sudo" : BIN;
-  const argv = SUDO ? [BIN, "--json", ...args] : ["--json", ...args];
-  return new Promise((resolve, reject) => {
-    execFile(
-      file,
-      argv,
-      { timeout: TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 },
-      (err, stdout, stderr) => {
-        const out = (stdout || "").trim();
-        // The CLI emits its JSON envelope on stdout even for handled errors
-        // (exit 1). Prefer parsing that over the raw process error.
-        let parsed = null;
-        if (out) {
-          try {
-            parsed = JSON.parse(out);
-          } catch {
-            /* fall through to error handling below */
-          }
-        }
-        if (parsed && parsed.ok === true) return resolve(parsed.data);
-        if (parsed && parsed.ok === false) {
-          const e = parsed.error || {};
-          return reject(
-            new Error(`5dive: ${e.message || "error"}${e.code ? ` (${e.code})` : ""}`)
-          );
-        }
-        if (err) {
-          const detail = (stderr || err.message || "").trim();
-          return reject(new Error(`5dive invocation failed: ${detail}`));
-        }
-        reject(new Error(`5dive: unparseable output: ${out.slice(0, 400)}`));
-      }
+function flags(argv) {
+  const out = { _: [] };
+  for (const a of argv) {
+    const m = /^--([a-z-]+)(?:=(.*))?$/.exec(a);
+    if (m) out[m[1]] = m[2] === undefined ? true : m[2];
+    else out._.push(a);
+  }
+  return out;
+}
+
+function die(msg) {
+  process.stderr.write(`5dive-mcp: ${msg}\n`);
+  process.exit(2);
+}
+
+async function stdio() {
+  const server = new Server(
+    { name: "5dive-mcp", version: "0.2.0" },
+    { capabilities: { tools: {} } }
+  );
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: TOOLS.map(({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    })),
+  }));
+  server.setRequestHandler(CallToolRequestSchema, async (request) =>
+    callTool(request.params.name, request.params.arguments || {})
+  );
+  await server.connect(new StdioServerTransport());
+  // stderr is safe for logs — stdout is the MCP framing channel.
+  process.stderr.write(`5dive-mcp ready (${TOOLS.length} tools; bin=${BIN_LABEL})\n`);
+}
+
+function serve(f) {
+  const listen = typeof f.listen === "string" ? f.listen : "127.0.0.1:8741";
+  const i = listen.lastIndexOf(":");
+  const host = listen.slice(0, i).replace(/^\[|\]$/g, "");
+  const port = Number(listen.slice(i + 1));
+  if (i < 0 || !host || !Number.isInteger(port) || port <= 0 || port > 65535) {
+    die(`--listen must be host:port, got "${listen}"`);
+  }
+  // Plain HTTP on a public interface sends the bearer token in the clear.
+  if (!isLoopback(host) && !f["allow-public-http"]) {
+    die(
+      `refusing to listen on ${host}: this server speaks plain HTTP. Listen on 127.0.0.1 and put ` +
+        `HTTPS in front of it (Caddy, nginx), or pass --allow-public-http if something else ` +
+        `already encrypts the hop.`
+    );
+  }
+  const ratePerMin = f.rate === undefined ? 60 : Number(f.rate);
+  if (!Number.isInteger(ratePerMin) || ratePerMin < 1) die("--rate must be a positive integer");
+  const path = typeof f.path === "string" ? f.path : "/mcp";
+  if (!path.startsWith("/")) die("--path must start with /");
+  if (listTokens().length === 0) {
+    process.stderr.write(
+      `5dive-mcp: no tokens yet, so every request will be refused. Mint one: 5dive-mcp token create --name=chatgpt\n`
+    );
+  }
+  const server = createServer({ path, ratePerMin });
+  server.listen(port, host, () => {
+    process.stderr.write(
+      `5dive-mcp serving http://${listen}${path} (${TOOLS.length} tools; bin=${BIN_LABEL}; ` +
+        `${ratePerMin}/min per token; tokens ${tokensPath()}; audit ${auditPath()})\n`
     );
   });
+  const stop = () => server.close(() => process.exit(0));
+  process.on("SIGTERM", stop);
+  process.on("SIGINT", stop);
 }
 
-// Push --flag=value onto argv when the input field is present and non-empty.
-function pushFlag(argv, name, value) {
-  if (value === undefined || value === null || value === "") return;
-  argv.push(`--${name}=${value}`);
-}
-
-const TOOLS = [
-  {
-    name: "task_create",
-    description:
-      "Create a task in the shared 5dive task queue. Returns the new task's id (e.g. DIVE-N). Use for filing work for an agent or human on the fleet.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: { type: "string", description: "Short task title." },
-        body: { type: "string", description: "Full task description / context." },
-        priority: {
-          type: "string",
-          enum: ["low", "medium", "high", "urgent"],
-          description: "Task priority (default: medium).",
-        },
-        assignee: { type: "string", description: "Agent name to assign to." },
-        parent: {
-          type: "string",
-          description: "Parent task id (numeric or DIVE-N) to nest under.",
-        },
-        from: { type: "string", description: "Who is filing the task." },
-      },
-      required: ["title"],
-      additionalProperties: false,
-    },
-    toArgs(input) {
-      // Flags first, then `--`, then the positional title. The `--`
-      // end-of-options separator makes a title that starts with "--" safe
-      // (the CLI treats everything after `--` as positional, not a flag).
-      const argv = ["task", "add"];
-      pushFlag(argv, "body", input.body);
-      pushFlag(argv, "priority", input.priority);
-      pushFlag(argv, "assignee", input.assignee);
-      pushFlag(argv, "parent", input.parent);
-      pushFlag(argv, "from", input.from);
-      argv.push("--", String(input.title));
-      return argv;
-    },
-  },
-  {
-    name: "task_show",
-    description:
-      "Fetch full detail for one task by id (numeric or DIVE-N): status, priority, body, result, subtasks, and blockers.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", description: "Task id, e.g. 923 or DIVE-923." },
-      },
-      required: ["id"],
-      additionalProperties: false,
-    },
-    toArgs(input) {
-      // `task show` reads its id positionally without a `--` separator, so
-      // guard against an id that would be misparsed as a flag. Real ids are
-      // numeric or DIVE-N and never start with "-".
-      const id = String(input.id);
-      if (id.startsWith("-")) throw new Error(`invalid task id: ${id}`);
-      return ["task", "show", id];
-    },
-  },
-  {
-    name: "task_list",
-    description:
-      "List tasks in the shared queue. Defaults to open tasks in priority order; filter by status or assignee.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        status: {
-          type: "string",
-          description: "Filter by status (e.g. todo, in_progress, blocked, done).",
-        },
-        assignee: { type: "string", description: "Filter by assignee agent name." },
-        all: { type: "boolean", description: "Include closed tasks too." },
-      },
-      additionalProperties: false,
-    },
-    toArgs(input) {
-      const argv = ["task", "ls"];
-      pushFlag(argv, "status", input.status);
-      pushFlag(argv, "assignee", input.assignee);
-      if (input.all) argv.push("--all");
-      return argv;
-    },
-  },
-  {
-    name: "agent_send",
-    description:
-      "Send a message to another agent on the fleet by name (inter-agent comms). The recipient receives it in-session.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Recipient agent name." },
-        message: { type: "string", description: "Message text to deliver." },
-        from: { type: "string", description: "Sender label (optional)." },
-      },
-      required: ["name", "message"],
-      additionalProperties: false,
-    },
-    toArgs(input) {
-      // Flags first, then `--`, then the positional recipient name, so a
-      // name starting with "--" can't be misparsed as a flag.
-      const argv = ["agent", "send", `--message=${input.message}`];
-      pushFlag(argv, "from", input.from);
-      argv.push("--", String(input.name));
-      return argv;
-    },
-  },
-  {
-    name: "agent_list",
-    description:
-      "List every agent on the box: name, type, channels, model, and live state.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-    toArgs() {
-      return ["agent", "list"];
-    },
-  },
-  {
-    name: "digest_get",
-    description:
-      "Get the fleet's daily standup digest (activity, token burn, health). Pass window=7d for the weekly view.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        window: {
-          type: "string",
-          enum: ["1d", "7d"],
-          description: "Digest window: 1d (default) or 7d.",
-        },
-      },
-      additionalProperties: false,
-    },
-    toArgs(input) {
-      const argv = ["digest"];
-      if (input.window === "7d") argv.push("--7d");
-      return argv;
-    },
-  },
-];
-
-const TOOL_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
-
-const server = new Server(
-  { name: "5dive-mcp", version: "0.1.0" },
-  { capabilities: { tools: {} } }
-);
-
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: TOOLS.map(({ name, description, inputSchema }) => ({
-    name,
-    description,
-    inputSchema,
-  })),
-}));
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const tool = TOOL_BY_NAME.get(request.params.name);
-  if (!tool) {
-    return {
-      isError: true,
-      content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }],
-    };
+function token(f) {
+  const [, sub] = f._;
+  if (sub === "create") {
+    if (typeof f.name !== "string") die("token create needs --name=<name>");
+    let t;
+    try {
+      t = createToken({ name: f.name, write: Boolean(f.write) });
+    } catch (err) {
+      die(err.message);
+    }
+    process.stdout.write(
+      `${t}\n\n` +
+        `Token "${f.name}" (${f.write ? "read + write" : "read-only"}). This is the only time it is shown.\n` +
+        `  Header clients:  Authorization: Bearer <token>   at  https://<your-domain>/mcp\n` +
+        `  ChatGPT (no-auth connector):                        https://<your-domain>/mcp/<token>\n` +
+        `Revoke: 5dive-mcp token revoke --name=${f.name}\n`
+    );
+    return;
   }
-  const input = request.params.arguments || {};
-  try {
-    const data = await run5dive(tool.toArgs(input));
-    return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-    };
-  } catch (err) {
-    return {
-      isError: true,
-      content: [{ type: "text", text: err.message || String(err) }],
-    };
+  if (sub === "list") {
+    const rows = listTokens();
+    if (rows.length === 0) return process.stdout.write("no tokens\n");
+    for (const r of rows) {
+      process.stdout.write(`${r.name}\t${r.write ? "read+write" : "read-only"}\t${r.created_at}\n`);
+    }
+    return;
   }
-});
-
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  // stderr is safe for logs — stdout is the MCP framing channel.
-  process.stderr.write(
-    `5dive-mcp ready (${TOOLS.length} tools; bin=${SUDO ? "sudo " : ""}${BIN})\n`
-  );
+  if (sub === "revoke") {
+    if (typeof f.name !== "string") die("token revoke needs --name=<name>");
+    if (!revokeToken(f.name)) die(`no token named "${f.name}"`);
+    process.stdout.write(`revoked "${f.name}" (a running server refuses it from the next request)\n`);
+    return;
+  }
+  die(USAGE);
 }
 
-main().catch((err) => {
-  process.stderr.write(`5dive-mcp fatal: ${err?.stack || err}\n`);
-  process.exit(1);
-});
+const f = flags(process.argv.slice(2));
+const cmd = f._[0];
+if (f.help || cmd === "help") {
+  process.stdout.write(USAGE + "\n");
+} else if (cmd === undefined || cmd === "stdio") {
+  stdio().catch((err) => {
+    process.stderr.write(`5dive-mcp fatal: ${err?.stack || err}\n`);
+    process.exit(1);
+  });
+} else if (cmd === "serve") {
+  serve(f);
+} else if (cmd === "token") {
+  token(f);
+} else {
+  die(`unknown command "${cmd}"\n${USAGE}`);
+}

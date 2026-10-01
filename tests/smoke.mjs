@@ -3,6 +3,9 @@
 // JSON-RPC responses from stdout. Exits non-zero on any failure.
 import { spawn } from "node:child_process";
 
+// Any task id that exists on the box you smoke against.
+const TASK = process.env.SMOKE_TASK || "DIVE-923";
+
 const child = spawn(process.execPath, [new URL("../src/index.js", import.meta.url).pathname], {
   env: { ...process.env, FIVEDIVE_SUDO: "1" },
   stdio: ["pipe", "pipe", "inherit"],
@@ -54,9 +57,9 @@ try {
   assert(names.length === 6, `tools/list returns 6 tools (${names.join(",")})`);
   assert(names.includes("task_show") && names.includes("agent_send"), "core tools present");
 
-  const show = await rpc("tools/call", { name: "task_show", arguments: { id: "DIVE-923" } });
+  const show = await rpc("tools/call", { name: "task_show", arguments: { id: TASK } });
   const showText = show.result?.content?.[0]?.text || "";
-  assert(!show.result?.isError && showText.includes("DIVE-923"), "task_show DIVE-923 returns live data");
+  assert(!show.result?.isError && showText.includes(TASK), `task_show ${TASK} returns live data`);
 
   const agents = await rpc("tools/call", { name: "agent_list", arguments: {} });
   const agentsText = agents.result?.content?.[0]?.text || "";

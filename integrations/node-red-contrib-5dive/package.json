@@ -14,7 +14,7 @@
   "files": ["nodes", "README.md"],
   "engines": { "node": ">=18" },
   "scripts": {
-    "build": "cp ../client/fivedive.ts lib-src/fivedive.ts && tsc -p tsconfig.json",
+    "build": "mkdir -p lib-src && cp ../client/fivedive.ts lib-src/fivedive.ts && tsc -p tsconfig.json",
     "test": "npm run build && node --test test/*.test.cjs"
   },
   "node-red": {

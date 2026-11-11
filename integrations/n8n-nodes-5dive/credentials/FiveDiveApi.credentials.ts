@@ -22,6 +22,15 @@ export class FiveDiveApi implements ICredentialType {
         "Create one in 5dive under Settings, API keys. To create tasks, allow it to act on your team.",
     },
     {
+      displayName: "Server Access Token",
+      name: "serverToken",
+      type: "string",
+      typeOptions: { password: true },
+      default: "",
+      description:
+        "Needed by most 5dive servers, because 5dive keeps no copy of it. Copy it from the 5dive dashboard: Server, Overview, Access token.",
+    },
+    {
       displayName: "Base URL",
       name: "baseUrl",
       type: "string",
@@ -30,7 +39,12 @@ export class FiveDiveApi implements ICredentialType {
   ];
   authenticate: IAuthenticateGeneric = {
     type: "generic",
-    properties: { headers: { Authorization: "=Bearer {{$credentials.apiKey}}" } },
+    properties: {
+      headers: {
+        Authorization: "=Bearer {{$credentials.apiKey}}",
+        "x-connectord-token": "={{$credentials.serverToken}}",
+      },
+    },
   };
   test: ICredentialTestRequest = {
     request: { baseURL: "={{$credentials.baseUrl}}", url: "/v1/agents" },

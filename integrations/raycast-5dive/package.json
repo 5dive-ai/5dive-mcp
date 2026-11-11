@@ -14,6 +14,7 @@
   ],
   "preferences": [
     { "name": "apiKey", "type": "password", "required": true, "title": "API Key", "description": "5dive → Settings → API keys. Allow it to act on your team to assign tasks." },
+    { "name": "serverToken", "type": "password", "required": false, "title": "Server Access Token", "description": "Most 5dive servers need it. 5dive dashboard → Server → Overview → Access token." },
     { "name": "baseUrl", "type": "textfield", "required": false, "title": "Base URL", "default": "https://api.5dive.com", "description": "Leave as is." }
   ],
   "dependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-5dive",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node-RED nodes that hand a task to your 5dive AI agent team and read its status back.",
   "keywords": ["node-red", "5dive", "ai-agents", "tasks"],
   "license": "MIT",

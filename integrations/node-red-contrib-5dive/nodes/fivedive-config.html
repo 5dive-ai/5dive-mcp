@@ -2,15 +2,17 @@
   RED.nodes.registerType("fivedive-config", {
     category: "config",
     defaults: { name: { value: "" }, baseUrl: { value: "https://api.5dive.com", required: true } },
-    credentials: { apiKey: { type: "password", required: true } },
+    credentials: { apiKey: { type: "password", required: true }, serverToken: { type: "password" } },
     label: function () { return this.name || "5dive account"; },
   });
 </script>
 <script type="text/html" data-template-name="fivedive-config">
   <div class="form-row"><label for="node-config-input-name">Name</label><input type="text" id="node-config-input-name" placeholder="5dive account"></div>
   <div class="form-row"><label for="node-config-input-apiKey">API key</label><input type="password" id="node-config-input-apiKey"></div>
+  <div class="form-row"><label for="node-config-input-serverToken">Server access token</label><input type="password" id="node-config-input-serverToken"></div>
   <div class="form-row"><label for="node-config-input-baseUrl">Base URL</label><input type="text" id="node-config-input-baseUrl"></div>
 </script>
 <script type="text/html" data-help-name="fivedive-config">
   <p>Your 5dive account. Create an API key in 5dive under Settings, API keys. To create tasks, allow the key to act on your team.</p>
+  <p>Most 5dive servers also need their <b>server access token</b>, because 5dive keeps no copy of it. Copy it from the 5dive dashboard: Server, Overview, Access token.</p>
 </script>

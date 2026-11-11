@@ -9,9 +9,11 @@ module.exports = function (RED) {
         apiKey: (this.credentials && this.credentials.apiKey) || "",
         baseUrl: this.baseUrl,
         userAgent: "node-red-contrib-5dive",
+        serverToken: (this.credentials && this.credentials.serverToken) || "",
+        settingsName: "the 5dive account node",
       });
   }
   RED.nodes.registerType("fivedive-config", FiveDiveConfig, {
-    credentials: { apiKey: { type: "password" } },
+    credentials: { apiKey: { type: "password" }, serverToken: { type: "password" } },
   });
 };

@@ -90,6 +90,8 @@ export class FiveDive implements INodeType {
       apiKey: String(creds.apiKey ?? ""),
       baseUrl: String(creds.baseUrl ?? ""),
       userAgent: "n8n-nodes-5dive",
+      serverToken: String(creds.serverToken ?? ""),
+      settingsName: "the 5dive API credential",
     });
     const items = this.getInputData();
     const out: INodeExecutionData[] = [];

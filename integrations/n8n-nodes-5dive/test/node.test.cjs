@@ -9,6 +9,7 @@ function fakeMcp(reply) {
   global.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
     calls.push({ url, auth: init.headers.Authorization, tool: body.params.name, args: body.params.arguments });
+    if ("x-connectord-token" in init.headers) calls.at(-1).serverToken = init.headers["x-connectord-token"];
     const r = reply(body.params.name, body.params.arguments);
     return { status: 200, text: async () => JSON.stringify({ jsonrpc: "2.0", id: body.id, result: r }) };
   };
@@ -16,9 +17,9 @@ function fakeMcp(reply) {
 }
 const ok = (data) => ({ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data });
 
-function ctx(params, items = [{ json: {} }], failOk = false) {
+function ctx(params, items = [{ json: {} }], failOk = false, extraCreds = {}) {
   return {
-    getCredentials: async () => ({ apiKey: "5d_test", baseUrl: "https://api.example.test/" }),
+    getCredentials: async () => ({ apiKey: "5d_test", baseUrl: "https://api.example.test/", ...extraCreds }),
     getInputData: () => items,
     getNodeParameter: (name, i, dflt) => (params[i] && name in params[i] ? params[i][name] : dflt),
     continueOnFail: () => failOk,
@@ -69,4 +70,30 @@ test("a tool error reaches the user as its sentence; continueOnFail keeps the it
 test("a bad key is a plain 401 message", async () => {
   global.fetch = async () => ({ status: 401, text: async () => '{"error":"Unauthorized"}' });
   await assert.rejects(new FiveDive().execute.call(ctx([{ operation: "get", task: "DIVE-1" }])), /did not accept this API key/);
+});
+
+// DIVE-8214: most hosted servers need their server access token.
+test("the credential has a password-type Server Access Token, and its test request sends it", () => {
+  const c = new FiveDiveApi();
+  const f = c.properties.find((p) => p.name === "serverToken");
+  assert.ok(f, "serverToken field");
+  assert.equal(f.typeOptions.password, true);
+  assert.notEqual(f.required, true);
+  assert.equal(c.authenticate.properties.headers["x-connectord-token"], "={{$credentials.serverToken}}");
+});
+
+test("the node sends the credential's server access token as x-connectord-token, and none when blank", async () => {
+  const calls = fakeMcp((_t, a) => ok({ task: a.task, status: "todo" }));
+  await new FiveDive().execute.call(ctx([{ operation: "get", task: "DIVE-1" }], undefined, false, { serverToken: "box-tok" }));
+  await new FiveDive().execute.call(ctx([{ operation: "get", task: "DIVE-1" }], undefined, false, { serverToken: "" }));
+  assert.equal(calls[0].serverToken, "box-tok");
+  assert.ok(!("serverToken" in calls[1]));
+});
+
+test("no server access token: the error says to add it in the credential", async () => {
+  fakeMcp(() => ({ content: [{ type: "text", text: "no server access token was presented, so the request never reached your server; regenerate the token and try again" }], isError: true }));
+  await assert.rejects(
+    new FiveDive().execute.call(ctx([{ operation: "get", task: "DIVE-1" }])),
+    /Add it in the 5dive API credential \(Server access token\)/,
+  );
 });

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-5dive",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hand a task to your 5dive AI agent team from n8n, and read its status back.",
   "keywords": ["n8n-community-node-package", "n8n", "5dive", "ai-agents", "tasks"],
   "license": "MIT",

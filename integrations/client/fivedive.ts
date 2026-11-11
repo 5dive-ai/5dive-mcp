@@ -5,6 +5,10 @@
 // key; creating a task, assigning one or messaging an agent needs a key that
 // was allowed to act on the team.
 //
+// Most hosted servers also need their SERVER ACCESS TOKEN: 5dive keeps no copy
+// of it, so the API key alone cannot reach the server. It rides as the
+// `x-connectord-token` header on every call when set, and is never logged.
+//
 // No dependencies: global fetch (Node 18+), or pass your own.
 
 export type Priority = "low" | "medium" | "high";
@@ -71,6 +75,10 @@ export interface FiveDiveOptions {
   fetch?: FetchLike;
   /** Sent as the client name, e.g. "n8n-nodes-5dive". */
   userAgent?: string;
+  /** The server access token. Optional: only servers whose token 5dive does not keep need it. */
+  serverToken?: string;
+  /** Where the user types the server access token, for error messages. e.g. "the 5dive credential". */
+  settingsName?: string;
 }
 
 export class FiveDiveError extends Error {
@@ -85,11 +93,32 @@ export class FiveDiveError extends Error {
 
 export const DEFAULT_BASE_URL = "https://api.5dive.com";
 
+// The API's own sentences when the server access token is missing or replaced
+// (5dive-api src/lib/connectord.ts, CONNECTORD_FAILURE_MESSAGE no_token and
+// token_invalid). Matched loosely so a reworded tail still maps.
+const NO_SERVER_TOKEN = /no server access token was presented/i;
+const STALE_SERVER_TOKEN = /server access token is stale/i;
+
+/** Turn the API's server-token sentence into one that says what to do in this add-on. */
+export function explainServerTokenError(text: string, settingsName: string, hadToken: boolean): string | null {
+  if (NO_SERVER_TOKEN.test(text)) {
+    return hadToken
+      ? `5dive could not reach your server with that server access token. Check it in ${settingsName}.`
+      : `Your 5dive server needs its server access token. Add it in ${settingsName} (Server access token).`;
+  }
+  if (STALE_SERVER_TOKEN.test(text)) {
+    return `Your server access token was replaced. Paste the new one in ${settingsName} (Server access token).`;
+  }
+  return null;
+}
+
 export class FiveDive {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetchFn: FetchLike;
   private readonly userAgent: string;
+  private readonly serverToken: string;
+  private readonly settingsName: string;
   private nextId = 1;
 
   constructor(opts: FiveDiveOptions) {
@@ -101,6 +130,13 @@ export class FiveDive {
     if (!f) throw new FiveDiveError("no fetch available: use Node 18 or newer, or pass one");
     this.fetchFn = f;
     this.userAgent = opts.userAgent || "5dive-client";
+    this.serverToken = (opts.serverToken ?? "").trim();
+    this.settingsName = opts.settingsName || "your 5dive settings";
+  }
+
+  private fail(text: string, status?: number): FiveDiveError {
+    const plain = explainServerTokenError(text, this.settingsName, this.serverToken !== "");
+    return new FiveDiveError(plain ?? text, status);
   }
 
   /** Call one tool on the hosted MCP and return its structured result. */
@@ -111,18 +147,16 @@ export class FiveDive {
       method: "tools/call",
       params: { name: tool, arguments: dropEmpty(args) },
     });
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      Authorization: `Bearer ${this.apiKey}`,
+      "User-Agent": this.userAgent,
+    };
+    if (this.serverToken) headers["x-connectord-token"] = this.serverToken;
     let res: { status: number; text(): Promise<string> };
     try {
-      res = await this.fetchFn(`${this.baseUrl}/mcp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json, text/event-stream",
-          Authorization: `Bearer ${this.apiKey}`,
-          "User-Agent": this.userAgent,
-        },
-        body,
-      });
+      res = await this.fetchFn(`${this.baseUrl}/mcp`, { method: "POST", headers, body });
     } catch (err) {
       throw new FiveDiveError(`could not reach 5dive: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -138,11 +172,11 @@ export class FiveDive {
     } catch {
       throw new FiveDiveError(`5dive answered ${res.status} with no JSON`, res.status);
     }
-    if (msg.error) throw new FiveDiveError(`5dive: ${msg.error.message ?? "request failed"}`, res.status);
+    if (msg.error) throw this.fail(`5dive: ${msg.error.message ?? "request failed"}`, res.status);
     const r = msg.result;
     if (!r) throw new FiveDiveError("5dive returned no result", res.status);
     const first = r.content?.find((c) => c.type === "text")?.text ?? "";
-    if (r.isError) throw new FiveDiveError(first || "the 5dive tool failed", res.status);
+    if (r.isError) throw this.fail(first || "the 5dive tool failed", res.status);
     if (r.structuredContent !== undefined) return r.structuredContent as T;
     try {
       return JSON.parse(first) as T;

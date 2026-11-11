@@ -7,7 +7,7 @@
 //
 // No dependencies: global fetch (Node 18+), or pass your own.
 
-export type Priority = "low" | "medium" | "high" | "urgent";
+export type Priority = "low" | "medium" | "high";
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done" | "cancelled" | "parked";
 
 export interface Task {

@@ -65,7 +65,6 @@ export default function Command() {
         <Form.Dropdown.Item value="low" title="Low" />
         <Form.Dropdown.Item value="medium" title="Medium" />
         <Form.Dropdown.Item value="high" title="High" />
-        <Form.Dropdown.Item value="urgent" title="Urgent" />
       </Form.Dropdown>
       <Form.TextArea id="details" title="Details" placeholder="Links, what done looks like…" />
     </Form>

@@ -60,7 +60,6 @@ export class FiveDive implements INodeType {
           { name: "Low", value: "low" },
           { name: "Medium", value: "medium" },
           { name: "High", value: "high" },
-          { name: "Urgent", value: "urgent" },
         ],
         default: "medium",
         displayOptions: { show: { operation: ["create"] } },

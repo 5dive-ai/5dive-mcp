@@ -1,0 +1,34 @@
+<script type="text/javascript">
+  RED.nodes.registerType("fivedive-get-task", {
+    category: "5dive",
+    color: "#e2e2e6",
+    defaults: {
+      name: { value: "" },
+      account: { value: "", type: "fivedive-config", required: true },
+      task: { value: "" },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "fivedive.svg",
+    paletteLabel: "get task",
+    label: function () { return this.name || "5dive: get task"; },
+  });
+</script>
+<script type="text/html" data-template-name="fivedive-get-task">
+  <div class="form-row"><label for="node-input-account">Account</label><input type="text" id="node-input-account"></div>
+  <div class="form-row"><label for="node-input-task">Task ID</label><input type="text" id="node-input-task" placeholder="or msg.payload"></div>
+  <div class="form-row"><label for="node-input-name">Name</label><input type="text" id="node-input-name"></div>
+</script>
+<script type="text/html" data-help-name="fivedive-get-task">
+  <p>Reads one task's status from your 5dive team.</p>
+  <h3>Input</h3>
+  <dl class="message-properties">
+    <dt class="optional">payload <span class="property-type">string | object</span></dt>
+    <dd>The task ID (<code>DIVE-12</code>) or <code>{task}</code>, if not set on the node.</dd>
+  </dl>
+  <h3>Output</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt>
+    <dd><code>task</code>, <code>status</code>, <code>assignee</code>, and <code>result</code> once it is done.</dd>
+  </dl>
+</script>

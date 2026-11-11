@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "commonjs",
+    "lib": ["ES2021", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "nodes/lib",
+    "rootDir": "lib-src"
+  },
+  "include": ["lib-src/*.ts"]
+}

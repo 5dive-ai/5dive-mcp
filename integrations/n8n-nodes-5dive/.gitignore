@@ -1,0 +1,4 @@
+node_modules
+dist
+nodes/FiveDive/fivedive.ts
+*.tgz

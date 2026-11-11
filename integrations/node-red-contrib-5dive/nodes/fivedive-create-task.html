@@ -1,0 +1,41 @@
+<script type="text/javascript">
+  RED.nodes.registerType("fivedive-create-task", {
+    category: "5dive",
+    color: "#e2e2e6",
+    defaults: {
+      name: { value: "" },
+      account: { value: "", type: "fivedive-config", required: true },
+      title: { value: "" },
+      agent: { value: "" },
+      priority: { value: "medium" },
+      details: { value: "" },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "fivedive.svg",
+    paletteLabel: "create task",
+    label: function () { return this.name || "5dive: create task"; },
+  });
+</script>
+<script type="text/html" data-template-name="fivedive-create-task">
+  <div class="form-row"><label for="node-input-account">Account</label><input type="text" id="node-input-account"></div>
+  <div class="form-row"><label for="node-input-title">Title</label><input type="text" id="node-input-title" placeholder="or msg.payload"></div>
+  <div class="form-row"><label for="node-input-agent">Agent</label><input type="text" id="node-input-agent" placeholder="empty = team queue"></div>
+  <div class="form-row"><label for="node-input-priority">Priority</label>
+    <select id="node-input-priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+  <div class="form-row"><label for="node-input-details">Details</label><input type="text" id="node-input-details"></div>
+  <div class="form-row"><label for="node-input-name">Name</label><input type="text" id="node-input-name"></div>
+</script>
+<script type="text/html" data-help-name="fivedive-create-task">
+  <p>Gives your 5dive team a new task.</p>
+  <h3>Input</h3>
+  <dl class="message-properties">
+    <dt class="optional">payload <span class="property-type">string | object</span></dt>
+    <dd>The title, or <code>{title, agent, priority, details}</code>. Fields set on the node win.</dd>
+  </dl>
+  <h3>Output</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt>
+    <dd>The new task: <code>task</code> (its ID), <code>title</code>, <code>assignee</code>, <code>status</code>.</dd>
+  </dl>
+</script>

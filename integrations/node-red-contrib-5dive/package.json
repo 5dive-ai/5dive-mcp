@@ -1,0 +1,31 @@
+{
+  "name": "node-red-contrib-5dive",
+  "version": "0.1.0",
+  "description": "Node-RED nodes that hand a task to your 5dive AI agent team and read its status back.",
+  "keywords": ["node-red", "5dive", "ai-agents", "tasks"],
+  "license": "MIT",
+  "homepage": "https://github.com/5dive-ai/5dive-mcp/tree/main/integrations/node-red-contrib-5dive",
+  "author": "5dive (https://5dive.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5dive-ai/5dive-mcp",
+    "directory": "integrations/node-red-contrib-5dive"
+  },
+  "files": ["nodes", "README.md"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "mkdir -p lib-src && cp ../client/fivedive.ts lib-src/fivedive.ts && tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.cjs"
+  },
+  "node-red": {
+    "version": ">=3.0.0",
+    "nodes": {
+      "fivedive-config": "nodes/fivedive-config.js",
+      "fivedive-create-task": "nodes/fivedive-create-task.js",
+      "fivedive-get-task": "nodes/fivedive-get-task.js"
+    }
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

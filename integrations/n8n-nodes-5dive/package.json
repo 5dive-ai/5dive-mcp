@@ -1,0 +1,32 @@
+{
+  "name": "n8n-nodes-5dive",
+  "version": "0.1.0",
+  "description": "Hand a task to your 5dive AI agent team from n8n, and read its status back.",
+  "keywords": ["n8n-community-node-package", "n8n", "5dive", "ai-agents", "tasks"],
+  "license": "MIT",
+  "homepage": "https://github.com/5dive-ai/5dive-mcp/tree/main/integrations/n8n-nodes-5dive",
+  "author": "5dive (https://5dive.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5dive-ai/5dive-mcp",
+    "directory": "integrations/n8n-nodes-5dive"
+  },
+  "main": "index.js",
+  "files": ["dist", "index.js", "README.md"],
+  "scripts": {
+    "build": "cp ../client/fivedive.ts nodes/FiveDive/fivedive.ts && tsc -p tsconfig.json && cp nodes/FiveDive/*.svg dist/nodes/FiveDive/ && cp credentials/*.svg dist/credentials/",
+    "test": "npm run build && node --test test/*.test.cjs"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": ["dist/credentials/FiveDiveApi.credentials.js"],
+    "nodes": ["dist/nodes/FiveDive/FiveDive.node.js"]
+  },
+  "devDependencies": {
+    "n8n-workflow": "2.16.0",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}

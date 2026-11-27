@@ -4,10 +4,13 @@
 [![Awesome MCP Servers](https://img.shields.io/badge/Awesome-MCP%20Servers-8A2BE2)](https://github.com/punkpeye/awesome-mcp-servers)
 
 Expose the [**5dive**](https://5dive.ai) agent-fleet CLI as [Model Context
-Protocol](https://modelcontextprotocol.io) tools. Point any MCP client (Claude
-Desktop, Cursor, Cline, or your own) at this stdio server to file tasks, inspect
-and message agents, and read the fleet digest — directly from inside a model
-context.
+Protocol](https://modelcontextprotocol.io) tools, so the assistant you already
+chat with (Claude, ChatGPT, OpenAI dots, Grok, Cursor, …) can run your 5dive
+team: see what is blocked, file and assign work, message agents and read their
+answers, hire from the marketplace, and answer the team's ordinary decisions.
+
+It has the same tools, names and refusals as 5dive's hosted connector
+(`https://api.5dive.com/mcp`), running on your own box.
 
 [5dive](https://5dive.ai) is the CLI + control plane for running a fleet of
 autonomous coding agents as a self-governing company. This server is a thin,
@@ -17,14 +20,35 @@ CLI's auth, permissions, and audit log for free, and never handles secrets itsel
 
 ## Tools
 
-| Tool | Wraps | What it does |
+| Tool | Writes | What it does |
 | --- | --- | --- |
-| `task_create` | `5dive task add` | File a task in the shared queue (title, body, priority, assignee, parent). |
-| `task_show` | `5dive task show` | Full detail for one task by id (status, body, result, subtasks, blockers). |
-| `task_list` | `5dive task ls` | List tasks (open by default; filter by status / assignee). |
-| `agent_send` | `5dive agent send` | Send a message to another agent on the fleet. |
-| `agent_list` | `5dive agent list` | List every agent: type, channels, model, live state. |
-| `digest_get` | `5dive digest` | Fleet daily standup digest (`window: "7d"` for the weekly view). |
+| `fleet_status` | | One-call overview: agents, open tasks, what is blocked, what waits on you. |
+| `agents_list` | | Every agent: type, model, live state, channels. |
+| `agents_send` | ✓ | Message an agent and wake it. Returns a `reply_id`. |
+| `agents_read` | | That agent's answer to your message (by `reply_id`), nothing else on its screen. |
+| `tasks_list` | | Tasks by status, assignee or project; `since` to catch finished work. |
+| `tasks_get` | | One task: result, delivery link, review verdict, blockers. |
+| `tasks_create` | ✓ | File a task, with acceptance criteria, a reviewer and a project. |
+| `tasks_assign` | ✓ | Give a task to an agent; returns the undo. |
+| `tasks_update` | ✓ | Add a note, raise to high, add or drop a blocker, or cancel. |
+| `projects_list` | | The team's projects. |
+| `wiki_search` | | The shared team wiki only, never an agent's private notes. |
+| `marketplace_list` | | Agents you can hire. |
+| `agents_hire` | ✓ | Hire one onto the team. Never a paid one. |
+| `gates_list` | | What the team waits on you for, and which ones the assistant may answer. |
+| `gates_answer` | ✓ | Answer an ordinary decision or approval. Money, keys, manual steps and anything marked for you are refused. |
+| `secrets_request` | ✓ | A one-time link where you type a key; the assistant never sees it. |
+| `digest_get` | | The daily standup digest (`window: "7d"` for the week). |
+
+The 0.2 tool names (`task_create`, `task_show`, `task_list`, `agent_send`,
+`agent_list`) still work for existing setups but are no longer listed.
+
+**Differences from the hosted connector.** Your box has no 5dive app chat, so
+`agents_send` goes straight into the agent's session and `agents_read` reads its
+answer there (it needs `FIVEDIVE_SUDO=1` or root). There is no plan, so
+`agents_hire` stops at the team size you set in `FIVEDIVE_MCP_MAX_AGENTS`, if
+any. MCP events (pushes when a task is delivered or done) are left out: poll
+`tasks_list` with `since` instead.
 
 ## Requirements
 
@@ -56,7 +80,7 @@ npm i -g @5dive/mcp && 5dive-mcp
 ## Remote mode: `5dive-mcp serve` (ChatGPT, OpenAI dots)
 
 A client that runs in someone else's cloud can't spawn a stdio process on your
-box. `serve` puts the same six tools behind MCP's Streamable HTTP transport, on
+box. `serve` puts the same tools behind MCP's Streamable HTTP transport, on
 loopback, for your reverse proxy to publish over HTTPS.
 
 > Using **managed 5dive**? You don't need this: connect to
@@ -66,7 +90,7 @@ loopback, for your reverse proxy to publish over HTTPS.
 ```bash
 # 1. Mint a token. It is printed once; only its hash is kept.
 5dive-mcp token create --name=chatgpt            # read-only
-5dive-mcp token create --name=chatgpt --write    # may also file tasks and message agents
+5dive-mcp token create --name=chatgpt --write    # may also change things (the ✓ tools)
 
 # 2. Serve on loopback (default 127.0.0.1:8741, path /mcp).
 FIVEDIVE_SUDO=1 5dive-mcp serve
@@ -96,16 +120,17 @@ cuts one off, and a running server refuses it from the next request.
 
 ### Security: what opening this endpoint means
 
-- **What a token can do.** A read-only token can list agents and tasks, read a
-  task, and read the digest. A `--write` token can also file tasks
-  (`task_create`) and message agents (`agent_send`). No token can answer a gate,
-  change settings, spend money, or run anything outside those six CLI calls,
-  each built as a fixed argv with no shell. Whatever sender the remote client
-  claims is dropped: its messages arrive labelled `mcp-<token name>`, and its
-  tasks say in their body which connection filed them.
+- **What a token can do.** A read-only token can only read (the tools with no
+  ✓). A `--write` token can also use the ✓ tools. No token can answer a gate
+  about money, a key, a manual step or anything marked for you, see a key,
+  hire a paid agent, change settings, or run anything outside these tools'
+  CLI calls, each built as a fixed argv with no shell. Whatever sender the
+  remote client claims is dropped: its messages arrive labelled
+  `mcp-<token name>`, its tasks say in their body which connection filed
+  them, and a gate it answers is recorded as answered by `connector`.
 - **Who it runs as.** The tools run with the rights of the user running
   `serve`, plus root through `sudo` when `FIVEDIVE_SUDO=1`. The server only
-  ever runs those six subcommands, but a compromised server process holds that
+  ever runs these tools' subcommands, but a compromised server process holds that
   user's rights, so run it as a dedicated user whose sudo grant covers only
   the `5dive` binary.
 - **Rate limit.** 60 calls a minute per token by default (`--rate`), counted per
@@ -139,6 +164,7 @@ organization with tunnel permissions.
 | `FIVEDIVE_SUDO` | *(unset)* | Set to `1` to prefix calls with `sudo`. Managed 5dive boxes require root for most subcommands; leave unset if you already run as root. |
 | `FIVEDIVE_TIMEOUT_MS` | `30000` | Per-call timeout in milliseconds. |
 | `FIVEDIVE_MCP_HOME` | `~/.config/5dive-mcp` | Where `serve` keeps `tokens.json` and `audit.jsonl`. |
+| `FIVEDIVE_MCP_MAX_AGENTS` | *(no limit)* | Team size `agents_hire` will not hire past. |
 
 ## Safety
 
@@ -148,7 +174,7 @@ reads its own credentials from the box.
 
 ## Scope
 
-This mirrors a curated slice of the CLI (tasks, agents, digest), not its full
+This mirrors the hosted connector's team-lead slice of the CLI, not its full
 surface. It is a distribution and convenience layer, not a new API. For
 everything else, use the `5dive` CLI directly (`5dive --help`). Full docs: https://5dive.ai/docs/5dive-cli
 

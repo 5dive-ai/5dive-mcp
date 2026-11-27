@@ -13,8 +13,8 @@
 //     (`/mcp/<token>`) for clients that cannot set a header — ChatGPT's
 //     connector form offers OAuth or "No authentication", nothing in between;
 //   - tokens are read-only unless minted with --write; a read-only token
-//     calling task_create or agent_send gets a refusal, and the refusal is
-//     audited;
+//     calling any write tool (tasks_create, agents_send, gates_answer,
+//     agents_hire, …) gets a refusal, and the refusal is audited;
 //   - a per-token rate limit (default 60 calls a minute);
 //   - one message per POST (batches refused before anything runs), a 1 MiB
 //     body cap;
@@ -31,11 +31,14 @@ import { auditPath, tokenVerifier, tokensPath } from "./tokens.js";
 
 /** Newest first. We answer in the client's version when we know it. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
-const SERVER_INFO = { name: "5dive", title: "5dive agent team", version: "0.2.0" };
+const SERVER_INFO = { name: "5dive", title: "5dive agent team", version: "0.3.0" };
 const INSTRUCTIONS =
-  "These tools operate the user's own self-hosted 5dive team of AI agents. Start with " +
-  "agent_list and task_list. You can file tasks and message agents only if this connection " +
-  "was set up with write access.";
+  "These tools run the user's own self-hosted 5dive team of AI agents; you act as its lead. Start with " +
+  "fleet_status. File work with tasks_create (say what done looks like in accept, name a reviewer, " +
+  "and a project when there is one: projects_list). Check the team wiki (wiki_search) before asking " +
+  "what the team may already know. Message an agent with agents_send and read its answer with " +
+  "agents_read. Answer the decisions gates_list marks you_can_answer; money, keys and manual steps " +
+  "stay with the user. Changing anything needs a connection set up with write access.";
 const MAX_BODY = 1024 * 1024;
 
 const rpcError = (id, code, message) => ({ jsonrpc: "2.0", id: id ?? null, error: { code, message } });
@@ -53,7 +56,7 @@ export function toolList() {
 // owner's content, not ours to keep.
 function auditFields(input) {
   const out = {};
-  for (const k of ["id", "name", "assignee", "status", "parent"]) {
+  for (const k of ["id", "name", "assignee", "status", "parent", "task", "agent", "agent_id", "reviewer", "project", "key", "blocked_by", "unblock", "reply_id"]) {
     if (typeof input?.[k] === "string") out[k] = input[k].slice(0, 64);
   }
   return out;
@@ -134,7 +137,8 @@ export async function handleRpc(msg, { caller, exec = run5dive, audit = () => {}
         };
       }
       if (tool.write) stampSender(tool.name, input, caller.name);
-      const result = await callTool(tool.name, input, exec);
+      const ctx = { sender: `mcp-${caller.name}`, via: tool.write ? caller.name : undefined };
+      const result = await callTool(tool.name, input, exec, ctx);
       audit({ token: caller.name, tool: tool.name, ok: !result.isError, ...auditFields(input) });
       return { jsonrpc: "2.0", id, result };
     }

@@ -84,14 +84,26 @@ test("the token works as a header and as the last URL segment (ChatGPT no-auth c
     assert.deepEqual(
       j.result.tools.map((t) => [t.name, t.annotations.readOnlyHint]),
       [
-        ["task_create", false],
-        ["task_show", true],
-        ["task_list", true],
-        ["agent_send", false],
-        ["agent_list", true],
+        ["fleet_status", true],
+        ["agents_list", true],
+        ["agents_send", false],
+        ["agents_read", true],
+        ["tasks_list", true],
+        ["tasks_assign", false],
+        ["tasks_create", false],
+        ["tasks_get", true],
+        ["projects_list", true],
+        ["wiki_search", true],
+        ["marketplace_list", true],
+        ["agents_hire", false],
+        ["gates_list", true],
+        ["gates_answer", false],
+        ["tasks_update", false],
+        ["secrets_request", false],
         ["digest_get", true],
       ]
     );
+    // The 0.2 names are no longer listed, but an existing setup still calls them (below).
     // A notification gets 202 and no body.
     r = await s.post({ jsonrpc: "2.0", method: "notifications/initialized" }, { token: tok });
     assert.equal(r.status, 202);

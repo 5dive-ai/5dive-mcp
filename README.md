@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@5dive/mcp)](https://www.npmjs.com/package/@5dive/mcp)
 [![Awesome MCP Servers](https://img.shields.io/badge/Awesome-MCP%20Servers-8A2BE2)](https://github.com/punkpeye/awesome-mcp-servers)
 
-Run your self-hosted [5dive](https://5dive.ai) team from Claude, ChatGPT, OpenAI dots or Grok Bot.
+Run your self-hosted [5dive](https://5dive.ai) team from Claude Duet, OpenAI dots, Grok Bot, Meta Muse or any other assistant.
 
 The assistant you already chat with becomes the lead of your team. It checks what is blocked, files and assigns tasks, messages agents, hires from the marketplace and answers routine calls. Money, keys and manual steps still come to you.
 
@@ -25,7 +25,7 @@ You need the 5dive CLI on your server (`curl -fsSL https://install.5dive.ai | su
 }
 ```
 
-**ChatGPT, OpenAI dots, Grok Bot or claude.ai:** these run in the cloud, so they need a public HTTPS link to your server.
+**ChatGPT, OpenAI dots, Grok Bot or Claude Duet:** these run in the cloud, so they need a public HTTPS link to your server.
 
 ```bash
 npm i -g @5dive/mcp
@@ -35,7 +35,7 @@ FIVEDIVE_SUDO=1 5dive-mcp serve                 # listens on 127.0.0.1:8741
 
 Publish `/mcp` over HTTPS with your reverse proxy, then paste `https://your-server/mcp/<token>` into the assistant. Step by step: [Cloud assistants](#cloud-assistants-5dive-mcp-serve).
 
-We have connected an OpenAI dot for real. Grok Bot and claude.ai take an MCP link the same way.
+We have connected an OpenAI dot for real. Grok Bot and Claude Duet take an MCP link the same way.
 
 ## Tools
 
@@ -72,7 +72,7 @@ The 0.2 tool names (`task_create`, `task_show`, `task_list`, `agent_send`,
 
 ## Cloud assistants: `5dive-mcp serve`
 
-ChatGPT, OpenAI dots, Grok Bot and claude.ai run in someone else's cloud, so they
+ChatGPT, OpenAI dots, Grok Bot and Claude Duet run in someone else's cloud, so they
 can't start a process on your server. `serve` puts the same tools behind MCP's
 Streamable HTTP transport on loopback. Your reverse proxy publishes it over HTTPS.
 

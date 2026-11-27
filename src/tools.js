@@ -1,8 +1,12 @@
 // The 5dive tool set, shared by both transports (stdio in index.js, Streamable
 // HTTP in http.js). Every tool shells out to the local `5dive` binary with its
-// machine-readable `--json` surface ({ok:true,data} | {ok:false,error}) and
-// returns the `data` payload, so this is a thin, honest adapter — the CLI does
-// all the real work.
+// machine-readable `--json` surface ({ok:true,data} | {ok:false,error}), so this
+// is a thin, honest adapter — the CLI does all the real work.
+//
+// TOOLS (listed): the hosted connector's team-lead set (ops.js) plus
+// digest_get. LEGACY: the six 0.2 names (task_create, task_show, task_list,
+// agent_send, agent_list, digest_get), still callable so an existing setup
+// keeps working, but no longer listed: two names for one job confuse a model.
 //
 // Config (env):
 //   FIVEDIVE_BIN   path to the 5dive binary (default: "5dive", found on PATH)
@@ -12,6 +16,7 @@
 //   FIVEDIVE_TIMEOUT_MS  per-call timeout in ms (default: 30000)
 
 import { execFile } from "node:child_process";
+import { OPS } from "./ops.js";
 
 const BIN = process.env.FIVEDIVE_BIN || "5dive";
 const SUDO = /^(1|true|yes)$/i.test(process.env.FIVEDIVE_SUDO || "");
@@ -20,16 +25,19 @@ const TIMEOUT_MS = Number(process.env.FIVEDIVE_TIMEOUT_MS) || 30000;
 export const BIN_LABEL = `${SUDO ? "sudo " : ""}${BIN}`;
 
 // Run `5dive --json <args...>` with no shell (argv passed directly, so user
-// input can never be interpreted as shell syntax). Resolves to the parsed
-// envelope; rejects with a readable message on transport or CLI-level error.
-export function run5dive(args) {
+// input can never be interpreted as shell syntax). Resolves to the envelope's
+// data; rejects with a readable message on transport or CLI-level error.
+// `text`: the verb prints plain text even under --json (memory search, the
+// a2a reply read), so a clean exit's stdout IS the answer; its refusals still
+// come as the envelope.
+export function run5dive(args, opts = {}) {
   const file = SUDO ? "sudo" : BIN;
   const argv = SUDO ? [BIN, "--json", ...args] : ["--json", ...args];
   return new Promise((resolve, reject) => {
     execFile(
       file,
       argv,
-      { timeout: TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 },
+      { timeout: opts.timeoutMs || TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 },
       (err, stdout, stderr) => {
         const out = (stdout || "").trim();
         // The CLI emits its JSON envelope on stdout even for handled errors
@@ -49,6 +57,7 @@ export function run5dive(args) {
             new Error(`5dive: ${e.message || "error"}${e.code ? ` (${e.code})` : ""}`)
           );
         }
+        if (opts.text && !err) return resolve(out);
         if (err) {
           const detail = (stderr || err.message || "").trim();
           return reject(new Error(`5dive invocation failed: ${detail}`));
@@ -68,7 +77,7 @@ function pushFlag(argv, name, value) {
 // `write: true` marks a tool that changes the team (files a task, wakes an
 // agent). Over stdio that changes nothing; over HTTP it needs a token minted
 // with --write (see http.js).
-export const TOOLS = [
+export const LEGACY = [
   {
     name: "task_create",
     write: true,
@@ -213,16 +222,25 @@ export const TOOLS = [
   },
 ];
 
-export const TOOL_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
+const DIGEST = LEGACY.find((t) => t.name === "digest_get");
 
-/** Run one tool and shape the MCP result. A failure is a result, not a throw. */
-export async function callTool(name, input, exec = run5dive) {
+export const TOOLS = [...OPS, DIGEST];
+
+export const TOOL_BY_NAME = new Map([...LEGACY, ...TOOLS].map((t) => [t.name, t]));
+
+/**
+ * Run one tool and shape the MCP result. A failure is a result, not a throw.
+ * ctx: {sender, via} (see ops.js); http.js fills it from the token.
+ */
+export async function callTool(name, input, exec = run5dive, ctx = {}) {
   const tool = TOOL_BY_NAME.get(name);
   if (!tool) {
     return { isError: true, content: [{ type: "text", text: `Unknown tool: ${name}` }] };
   }
   try {
-    const data = await exec(tool.toArgs(input || {}));
+    const data = tool.run
+      ? await tool.run(input || {}, exec, ctx)
+      : await exec(tool.toArgs(input || {}));
     return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
   } catch (err) {
     return { isError: true, content: [{ type: "text", text: err.message || String(err) }] };

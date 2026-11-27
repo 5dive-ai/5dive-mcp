@@ -44,7 +44,7 @@ function die(msg) {
 
 async function stdio() {
   const server = new Server(
-    { name: "5dive-mcp", version: "0.2.0" },
+    { name: "5dive-mcp", version: "0.3.0" },
     { capabilities: { tools: {} } }
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -55,7 +55,7 @@ async function stdio() {
     })),
   }));
   server.setRequestHandler(CallToolRequestSchema, async (request) =>
-    callTool(request.params.name, request.params.arguments || {})
+    callTool(request.params.name, request.params.arguments || {}, undefined, { sender: "mcp" })
   );
   await server.connect(new StdioServerTransport());
   // stderr is safe for logs — stdout is the MCP framing channel.

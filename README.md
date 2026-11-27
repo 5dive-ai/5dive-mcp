@@ -3,20 +3,39 @@
 [![npm](https://img.shields.io/npm/v/@5dive/mcp)](https://www.npmjs.com/package/@5dive/mcp)
 [![Awesome MCP Servers](https://img.shields.io/badge/Awesome-MCP%20Servers-8A2BE2)](https://github.com/punkpeye/awesome-mcp-servers)
 
-Expose the [**5dive**](https://5dive.ai) agent-fleet CLI as [Model Context
-Protocol](https://modelcontextprotocol.io) tools, so the assistant you already
-chat with (Claude, ChatGPT, OpenAI dots, Grok, Cursor, …) can run your 5dive
-team: see what is blocked, file and assign work, message agents and read their
-answers, hire from the marketplace, and answer the team's ordinary decisions.
+Run your self-hosted [5dive](https://5dive.ai) team from Claude, ChatGPT, OpenAI dots or Grok Bot.
 
-It has the same tools, names and refusals as 5dive's hosted connector
-(`https://api.5dive.com/mcp`), running on your own box.
+The assistant you already chat with becomes the lead of your team. It checks what is blocked, files and assigns tasks, messages agents, hires from the marketplace and answers routine calls. Money, keys and manual steps still come to you.
 
-[5dive](https://5dive.ai) is the CLI + control plane for running a fleet of
-autonomous coding agents as a self-governing company. This server is a thin,
-honest adapter: every tool shells out to the local `5dive` binary's
-machine-readable `--json` surface and returns the result — so it inherits the
-CLI's auth, permissions, and audit log for free, and never handles secrets itself.
+## Quick start
+
+You need the 5dive CLI on your server (`curl -fsSL https://install.5dive.ai | sudo bash`) and Node.js 18 or newer.
+
+**Claude Desktop, Claude Code or Cursor on the same machine:** add a local MCP server.
+
+```json
+{
+  "mcpServers": {
+    "5dive": {
+      "command": "npx",
+      "args": ["-y", "@5dive/mcp"],
+      "env": { "FIVEDIVE_SUDO": "1" }
+    }
+  }
+}
+```
+
+**ChatGPT, OpenAI dots, Grok Bot or claude.ai:** these run in the cloud, so they need a public HTTPS link to your server.
+
+```bash
+npm i -g @5dive/mcp
+5dive-mcp token create --name=chatgpt --write   # prints a token once
+FIVEDIVE_SUDO=1 5dive-mcp serve                 # listens on 127.0.0.1:8741
+```
+
+Publish `/mcp` over HTTPS with your reverse proxy, then paste `https://your-server/mcp/<token>` into the assistant. Step by step: [Cloud assistants](#cloud-assistants-5dive-mcp-serve).
+
+We have connected an OpenAI dot for real. Grok Bot and claude.ai take an MCP link the same way.
 
 ## Tools
 
@@ -43,49 +62,19 @@ CLI's auth, permissions, and audit log for free, and never handles secrets itsel
 The 0.2 tool names (`task_create`, `task_show`, `task_list`, `agent_send`,
 `agent_list`) still work for existing setups but are no longer listed.
 
-**Differences from the hosted connector.** Your box has no 5dive app chat, so
-`agents_send` goes straight into the agent's session and `agents_read` reads its
-answer there (it needs `FIVEDIVE_SUDO=1` or root). There is no plan, so
-`agents_hire` stops at the team size you set in `FIVEDIVE_MCP_MAX_AGENTS`, if
-any. MCP events (pushes when a task is delivered or done) are left out: poll
-`tasks_list` with `since` instead.
+**On your own server:**
 
-## Requirements
+- `agents_send` types straight into the agent's session and `agents_read` reads its answer there. Both need `FIVEDIVE_SUDO=1` or root.
+- `agents_hire` stops at the team size you set in `FIVEDIVE_MCP_MAX_AGENTS`, if you set one.
+- The server does not push when a task is delivered or done. The assistant polls `tasks_list` with `since`.
 
-- Node.js >= 18
-- The `5dive` CLI installed and on `PATH` (`curl https://install.5dive.ai | sudo bash`).
+<a id="remote-mode-5dive-mcp-serve-chatgpt-openai-dots"></a>
 
-## Install & run
+## Cloud assistants: `5dive-mcp serve`
 
-```bash
-npx @5dive/mcp        # run directly
-# or
-npm i -g @5dive/mcp && 5dive-mcp
-```
-
-### Client config (Claude Desktop / Cursor / Cline)
-
-```json
-{
-  "mcpServers": {
-    "5dive": {
-      "command": "npx",
-      "args": ["-y", "@5dive/mcp"],
-      "env": { "FIVEDIVE_SUDO": "1" }
-    }
-  }
-}
-```
-
-## Remote mode: `5dive-mcp serve` (ChatGPT, OpenAI dots)
-
-A client that runs in someone else's cloud can't spawn a stdio process on your
-box. `serve` puts the same tools behind MCP's Streamable HTTP transport, on
-loopback, for your reverse proxy to publish over HTTPS.
-
-> Using **managed 5dive**? You don't need this: connect to
-> `https://api.5dive.com/mcp` and sign in. See
-> [the guide](https://5dive.ai/docs/openai-dots).
+ChatGPT, OpenAI dots, Grok Bot and claude.ai run in someone else's cloud, so they
+can't start a process on your server. `serve` puts the same tools behind MCP's
+Streamable HTTP transport on loopback. Your reverse proxy publishes it over HTTPS.
 
 ```bash
 # 1. Mint a token. It is printed once; only its hash is kept.
@@ -109,7 +98,7 @@ Then point the client at it:
   the token in the URL and choose "No authentication":
   `https://agents.example.com/mcp/<token>`.
 
-`5dive-mcp token list` shows the tokens; `5dive-mcp token revoke --name=chatgpt`
+`5dive-mcp token list` shows the tokens. `5dive-mcp token revoke --name=chatgpt`
 cuts one off, and a running server refuses it from the next request.
 
 | `serve` flag | Default | Purpose |
@@ -151,9 +140,9 @@ cuts one off, and a running server refuses it from the next request.
 
 Prefer no inbound port at all? OpenAI's
 [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
-runs a small client next to the server and connects out to OpenAI. Its
-`tunnel-client` can launch the stdio server directly
-(`--mcp-command "npx -y @5dive/mcp"`), but it needs an OpenAI Platform
+runs a small client on your server that dials out to OpenAI. The
+`tunnel-client` can launch the stdio server itself
+(`--mcp-command "npx -y @5dive/mcp"`). It needs an OpenAI Platform
 organization with tunnel permissions.
 
 ## Configuration (env vars)
@@ -161,22 +150,22 @@ organization with tunnel permissions.
 | Var | Default | Purpose |
 | --- | --- | --- |
 | `FIVEDIVE_BIN` | `5dive` | Path to the 5dive binary. |
-| `FIVEDIVE_SUDO` | *(unset)* | Set to `1` to prefix calls with `sudo`. Managed 5dive boxes require root for most subcommands; leave unset if you already run as root. |
+| `FIVEDIVE_SUDO` | *(unset)* | Set to `1` to prefix calls with `sudo`. Most 5dive subcommands need root. Leave unset if you already run as root. |
 | `FIVEDIVE_TIMEOUT_MS` | `30000` | Per-call timeout in milliseconds. |
 | `FIVEDIVE_MCP_HOME` | `~/.config/5dive-mcp` | Where `serve` keeps `tokens.json` and `audit.jsonl`. |
 | `FIVEDIVE_MCP_MAX_AGENTS` | *(no limit)* | Team size `agents_hire` will not hire past. |
 
-## Safety
+## How it works
 
-Arguments are passed to the CLI as an argv array with **no shell**, so tool input
-can never be interpreted as shell syntax. The server never sees secrets: the CLI
-reads its own credentials from the box.
+Every tool calls the local `5dive` CLI's `--json` output and returns the result,
+so it keeps the CLI's permissions and audit log. Arguments go to the CLI as an
+argv array with **no shell**, so tool input can never run as shell syntax. The
+server never sees secrets: the CLI reads its own credentials from the server.
 
-## Scope
+These tools cover what a team lead does day to day. For everything else, use the
+`5dive` CLI (`5dive --help`). Full docs: https://5dive.ai/docs/5dive-cli
 
-This mirrors the hosted connector's team-lead slice of the CLI, not its full
-surface. It is a distribution and convenience layer, not a new API. For
-everything else, use the `5dive` CLI directly (`5dive --help`). Full docs: https://5dive.ai/docs/5dive-cli
+On 5dive hosting? Connect in the 5dive app, nothing to install.
 
 ## License
 
